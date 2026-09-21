@@ -1,4 +1,4 @@
-const CSV_PATH = "/data/processed/asset_transfers_final.csv";
+const CSV_PATH = "atlm/data/processed/asset_transfers_final.csv";
 
 let allOperations = [];
 let filteredOperations = [];
