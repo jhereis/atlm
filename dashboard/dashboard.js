@@ -1,55 +1,83 @@
 const CSV_PATH = "data/processed/asset_transfers_final.csv";
 
 let allOperations = [];
-let filteredOperations = [];
+let showingAll = false;
 
-let slaChart;
-let riskChart;
-let exceptionChart;
+let slaChart = null;
+let riskChart = null;
+let exceptionChart = null;
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadCSV();
+
+    const showAllBtn = document.getElementById("showAllBtn");
+    const closeDetails = document.getElementById("closeDetails");
+
+    if (showAllBtn) {
+        showAllBtn.addEventListener("click", () => {
+            showingAll = !showingAll;
+            renderCriticalOperations();
+
+            showAllBtn.textContent = showingAll
+                ? "Show Critical"
+                : "View All";
+        });
+    }
+
+    if (closeDetails) {
+        closeDetails.addEventListener("click", closeOperationDetails);
+    }
 });
 
-const numberFormatter = new Intl.NumberFormat("en-US");
-
 
 // ============================================================
-// DATA LOADING
+// CSV LOADING
 // ============================================================
 
-function loadData() {
-
+function loadCSV() {
     Papa.parse(CSV_PATH, {
         download: true,
         header: true,
         skipEmptyLines: true,
 
-        complete: function(results) {
+        transformHeader: function(header) {
+            return header.trim();
+        },
 
-            if (!results.data || results.data.length === 0) {
-                console.error("CSV loaded but contains no records.");
-                return;
+        complete: function(results) {
+            console.log("CSV loaded:", results);
+
+            if (results.errors && results.errors.length > 0) {
+                console.warn("CSV parsing warnings:", results.errors);
             }
 
-            allOperations = results.data.filter(row => row.transfer_id);
-            filteredOperations = [...allOperations];
+            allOperations = results.data.filter(row => {
+                return row.transfer_id &&
+                       String(row.transfer_id).trim() !== "";
+            });
 
-            console.log(`Loaded ${allOperations.length} asset transfers.`);
+            console.log("Valid operations:", allOperations.length);
+
+            if (allOperations.length === 0) {
+                showError(
+                    "CSV loaded successfully, but no valid transfer records were found."
+                );
+                return;
+            }
 
             initializeDashboard();
         },
 
         error: function(error) {
+            console.error("CSV loading error:", error);
 
-            console.error("Could not load operational CSV:", error);
-
-            alert(
-                "Data loading error.\n\n" +
-                "Could not load asset_transfers_final.csv.\n\n" +
+            showError(
+                "Could not load asset_transfers_final.csv. " +
                 "Check the CSV path and GitHub Pages configuration."
             );
         }
@@ -58,153 +86,117 @@ function loadData() {
 
 
 // ============================================================
-// INITIALIZATION
+// DASHBOARD
 // ============================================================
 
 function initializeDashboard() {
-
-    renderKPIs();
+    updateKPIs();
     renderLifecycle();
     renderSLAChart();
     renderRiskChart();
     renderExceptionChart();
-    renderCriticalTable();
+    renderCriticalOperations();
 
+    console.log("Dashboard initialized successfully.");
 }
 
 
 // ============================================================
-// KPI CARDS
+// KPI
 // ============================================================
 
-function renderKPIs() {
+function updateKPIs() {
 
-    const total = allOperations.length;
+    const totalTransfers = allOperations.length;
 
-    const pending = allOperations.filter(
-        row => row.lifecycle_status !== "Completed"
-    ).length;
+    const pendingTransfers = allOperations.filter(row => {
+        const lifecycle = normalize(row.lifecycle_status);
+        const status = normalize(row.status);
 
-    const outsideSLA = allOperations.filter(
-        row => row.sla_status === "Outside SLA"
-    ).length;
+        return !isCompleted(lifecycle) &&
+               !isCompleted(status);
+    }).length;
 
-    const exceptions = allOperations.filter(
-        row => row.exception_flag === "1" ||
-               row.exception_flag === 1 ||
-               row.exception_flag === "True" ||
-               row.exception_flag === "true"
-    ).length;
+    const outsideSLA = allOperations.filter(row => {
+        return isOutsideSLA(row.sla_status);
+    }).length;
 
-    const critical = allOperations.filter(
-        row => row.operational_risk === "Critical"
-    ).length;
+    const exceptions = allOperations.filter(row => {
+        return isTrue(row.exception_flag);
+    }).length;
 
-    const totalValue = allOperations.reduce(
-        (sum, row) => sum + parseFloat(row.requested_value || 0),
-        0
-    );
+    const criticalRisk = allOperations.filter(row => {
+        const risk = normalize(row.final_risk_level);
+        const operationalRisk = normalize(row.operational_risk);
+
+        return risk === "critical" ||
+               operationalRisk === "critical";
+    }).length;
+
+    const assetValue = allOperations.reduce((total, row) => {
+        return total + numberValue(row.requested_value);
+    }, 0);
 
 
-    document.getElementById("totalTransfers").textContent =
-        numberFormatter.format(total);
-
-    document.getElementById("pendingTransfers").textContent =
-        numberFormatter.format(pending);
-
-    document.getElementById("outsideSla").textContent =
-        numberFormatter.format(outsideSLA);
-
-    document.getElementById("exceptions").textContent =
-        numberFormatter.format(exceptions);
-
-    document.getElementById("criticalRisk").textContent =
-        numberFormatter.format(critical);
-
-    document.getElementById("assetValue").textContent =
-        formatCompactCurrency(totalValue);
+    setText("totalTransfers", formatNumber(totalTransfers));
+    setText("pendingTransfers", formatNumber(pendingTransfers));
+    setText("outsideSla", formatNumber(outsideSLA));
+    setText("exceptions", formatNumber(exceptions));
+    setText("criticalRisk", formatNumber(criticalRisk));
+    setText("assetValue", formatCurrency(assetValue));
 }
 
 
 // ============================================================
-// LIFECYCLE
+// TRANSFER LIFECYCLE
 // ============================================================
 
 function renderLifecycle() {
 
     const container = document.getElementById("lifecycleFlow");
 
-    container.innerHTML = "";
+    if (!container) return;
+
+    const stages = {};
+
+    allOperations.forEach(row => {
+
+        const stage =
+            cleanValue(row.current_stage) ||
+            cleanValue(row.lifecycle_status) ||
+            "Unknown";
+
+        stages[stage] = (stages[stage] || 0) + 1;
+    });
+
+    const sortedStages = Object.entries(stages)
+        .sort((a, b) => b[1] - a[1]);
 
 
-    const stages = [
-        {
-            name: "Requested",
-            values: ["Requested"]
-        },
-        {
-            name: "Validation",
-            values: ["Validation"]
-        },
-        {
-            name: "Approval",
-            values: ["Approval"]
-        },
-        {
-            name: "Registered",
-            values: ["Registered"]
-        },
-        {
-            name: "Sent to Custodian",
-            values: ["Sent to Custodian"]
-        },
-        {
-            name: "In Transit",
-            values: ["In Transit"]
-        },
-        {
-            name: "Settlement",
-            values: ["Settlement"]
-        },
-        {
-            name: "Reconciliation",
-            values: ["Reconciliation"]
-        },
-        {
-            name: "Completed",
-            values: ["Completed"]
-        }
-    ];
+    container.innerHTML = sortedStages.map(([stage, count]) => {
 
+        const percentage =
+            ((count / allOperations.length) * 100).toFixed(1);
 
-    stages.forEach(stage => {
+        return `
+            <div class="lifecycle-step">
 
-        const count = allOperations.filter(row =>
-            stage.values.includes(row.current_stage) ||
-            stage.values.includes(row.lifecycle_status)
-        ).length;
+                <div class="lifecycle-step-title">
+                    ${escapeHTML(stage)}
+                </div>
 
+                <strong>
+                    ${formatNumber(count)}
+                </strong>
 
-        const stageElement = document.createElement("div");
+                <small>
+                    ${percentage}% of transfers
+                </small>
 
-        stageElement.className = "lifecycle-stage";
-
-        stageElement.innerHTML = `
-            <div class="stage-name">
-                ${stage.name}
-            </div>
-
-            <span class="stage-count">
-                ${numberFormatter.format(count)}
-            </span>
-
-            <div class="stage-label">
-                operations
             </div>
         `;
 
-        container.appendChild(stageElement);
-    });
+    }).join("");
 }
 
 
@@ -214,57 +206,76 @@ function renderLifecycle() {
 
 function renderSLAChart() {
 
-    const within = allOperations.filter(
-        row => row.sla_status === "Within SLA"
-    ).length;
+    const canvas = document.getElementById("slaChart");
 
-    const outside = allOperations.filter(
-        row => row.sla_status === "Outside SLA"
-    ).length;
+    if (!canvas) return;
 
+    const counts = {
+        within: 0,
+        outside: 0,
+        unknown: 0
+    };
 
-    const ctx = document
-        .getElementById("slaChart")
-        .getContext("2d");
+    allOperations.forEach(row => {
+
+        const value = normalize(row.sla_status);
+
+        if (
+            value.includes("outside") ||
+            value.includes("breach") ||
+            value.includes("overdue") ||
+            value.includes("fora")
+        ) {
+            counts.outside++;
+
+        } else if (
+            value.includes("within") ||
+            value.includes("on time") ||
+            value.includes("ontime") ||
+            value.includes("within sla") ||
+            value.includes("dentro")
+        ) {
+            counts.within++;
+
+        } else {
+            counts.unknown++;
+        }
+    });
 
 
     if (slaChart) {
         slaChart.destroy();
     }
 
-
-    slaChart = new Chart(ctx, {
+    slaChart = new Chart(canvas, {
 
         type: "doughnut",
 
         data: {
             labels: [
                 "Within SLA",
-                "Outside SLA"
+                "Outside SLA",
+                "Unknown"
             ],
 
             datasets: [{
                 data: [
-                    within,
-                    outside
+                    counts.within,
+                    counts.outside,
+                    counts.unknown
                 ]
             }]
         },
 
         options: {
-
             responsive: true,
-
             maintainAspectRatio: false,
 
             plugins: {
-
                 legend: {
                     position: "bottom"
                 }
-            },
-
-            cutout: "68%"
+            }
         }
     });
 }
@@ -276,24 +287,46 @@ function renderSLAChart() {
 
 function renderRiskChart() {
 
-    const levels = [
-        "Low",
-        "Medium",
-        "High",
-        "Critical"
-    ];
+    const canvas = document.getElementById("riskChart");
+
+    if (!canvas) return;
+
+    const riskCounts = {
+        Low: 0,
+        Medium: 0,
+        High: 0,
+        Critical: 0,
+        Unknown: 0
+    };
 
 
-    const values = levels.map(level =>
-        allOperations.filter(
-            row => row.operational_risk === level
-        ).length
-    );
+    allOperations.forEach(row => {
 
+        const risk =
+            cleanValue(row.final_risk_level) ||
+            cleanValue(row.operational_risk);
 
-    const ctx = document
-        .getElementById("riskChart")
-        .getContext("2d");
+        const normalized = normalize(risk);
+
+        if (normalized === "low") {
+            riskCounts.Low++;
+
+        } else if (
+            normalized === "medium" ||
+            normalized === "moderate"
+        ) {
+            riskCounts.Medium++;
+
+        } else if (normalized === "high") {
+            riskCounts.High++;
+
+        } else if (normalized === "critical") {
+            riskCounts.Critical++;
+
+        } else {
+            riskCounts.Unknown++;
+        }
+    });
 
 
     if (riskChart) {
@@ -301,40 +334,37 @@ function renderRiskChart() {
     }
 
 
-    riskChart = new Chart(ctx, {
+    riskChart = new Chart(canvas, {
 
-        type: "bar",
+        type: "doughnut",
 
         data: {
-
-            labels: levels,
+            labels: [
+                "Low",
+                "Medium",
+                "High",
+                "Critical",
+                "Unknown"
+            ],
 
             datasets: [{
-                label: "Transfers",
-                data: values,
-                borderRadius: 5
+                data: [
+                    riskCounts.Low,
+                    riskCounts.Medium,
+                    riskCounts.High,
+                    riskCounts.Critical,
+                    riskCounts.Unknown
+                ]
             }]
         },
 
         options: {
-
             responsive: true,
-
             maintainAspectRatio: false,
 
             plugins: {
                 legend: {
-                    display: false
-                }
-            },
-
-            scales: {
-
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        precision: 0
-                    }
+                    position: "bottom"
                 }
             }
         }
@@ -348,37 +378,27 @@ function renderRiskChart() {
 
 function renderExceptionChart() {
 
-    const exceptionMap = {};
+    const canvas = document.getElementById("exceptionChart");
+
+    if (!canvas) return;
+
+    const exceptionCounts = {};
+
+    allOperations
+        .filter(row => isTrue(row.exception_flag))
+        .forEach(row => {
+
+            const type =
+                cleanValue(row.exception_type) ||
+                "Unknown";
+
+            exceptionCounts[type] =
+                (exceptionCounts[type] || 0) + 1;
+        });
 
 
-    allOperations.forEach(row => {
-
-        const exception = row.exception_type;
-
-        if (
-            exception &&
-            exception !== "None" &&
-            exception !== "nan"
-        ) {
-
-            exceptionMap[exception] =
-                (exceptionMap[exception] || 0) + 1;
-        }
-    });
-
-
-    const sortedExceptions = Object.entries(exceptionMap)
+    const entries = Object.entries(exceptionCounts)
         .sort((a, b) => b[1] - a[1]);
-
-
-    const labels = sortedExceptions.map(item => item[0]);
-
-    const values = sortedExceptions.map(item => item[1]);
-
-
-    const ctx = document
-        .getElementById("exceptionChart")
-        .getContext("2d");
 
 
     if (exceptionChart) {
@@ -386,43 +406,37 @@ function renderExceptionChart() {
     }
 
 
-    exceptionChart = new Chart(ctx, {
+    exceptionChart = new Chart(canvas, {
 
         type: "bar",
 
         data: {
 
-            labels: labels,
+            labels: entries.map(item => item[0]),
 
             datasets: [{
                 label: "Exceptions",
-                data: values,
-                borderRadius: 5
+                data: entries.map(item => item[1])
             }]
         },
 
         options: {
 
-            indexAxis: "y",
-
             responsive: true,
 
             maintainAspectRatio: false,
 
-            plugins: {
+            indexAxis: "y",
 
+            plugins: {
                 legend: {
                     display: false
                 }
             },
 
             scales: {
-
                 x: {
-                    beginAtZero: true,
-                    ticks: {
-                        precision: 0
-                    }
+                    beginAtZero: true
                 }
             }
         }
@@ -431,81 +445,131 @@ function renderExceptionChart() {
 
 
 // ============================================================
-// CRITICAL OPERATIONS
+// CRITICAL OPERATIONS TABLE
 // ============================================================
 
-function renderCriticalTable() {
+function renderCriticalOperations() {
 
-    const table = document.getElementById("criticalTable");
+    const tbody = document.getElementById("criticalTable");
 
-    table.innerHTML = "";
-
-
-    const criticalOperations = allOperations
-        .filter(row =>
-            row.operational_risk === "Critical"
-        )
-        .sort((a, b) =>
-            parseFloat(b.risk_score || 0) -
-            parseFloat(a.risk_score || 0)
-        )
-        .slice(0, 15);
+    if (!tbody) return;
 
 
-    criticalOperations.forEach(operation => {
-
-        const row = document.createElement("tr");
-
-        row.addEventListener(
-            "click",
-            () => showOperationDetails(operation)
-        );
+    let operations;
 
 
-        row.innerHTML = `
+    if (showingAll) {
 
-            <td>
-                <strong>
-                    ${operation.transfer_id}
-                </strong>
-            </td>
+        operations = [...allOperations]
+            .sort(sortByRiskAndSLA);
 
-            <td>
-                ${operation.asset_name || "-"}
-                <br>
-                <small>
-                    ${operation.ticker || ""}
-                </small>
-            </td>
+    } else {
 
-            <td>
-                ${formatCurrency(operation.requested_value)}
-            </td>
+        operations = allOperations
+            .filter(isCriticalOperation)
+            .sort(sortByRiskAndSLA);
 
-            <td>
-                ${operation.current_stage || "-"}
-            </td>
+    }
 
-            <td>
-                <span class="badge badge-sla">
-                    ${operation.sla_status || "-"}
-                </span>
-            </td>
 
-            <td>
-                <span class="badge badge-critical">
-                    ${operation.operational_risk}
-                </span>
-            </td>
+    if (operations.length === 0) {
 
-            <td>
-                ${getPrimaryDriver(operation)}
-            </td>
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align:center;">
+                    No critical operations found.
+                </td>
+            </tr>
         `;
 
+        return;
+    }
 
-        table.appendChild(row);
-    });
+
+    tbody.innerHTML = operations
+        .slice(0, 20)
+        .map(row => {
+
+            const risk =
+                cleanValue(row.final_risk_level) ||
+                cleanValue(row.operational_risk) ||
+                "Unknown";
+
+            const stage =
+                cleanValue(row.current_stage) ||
+                cleanValue(row.lifecycle_status) ||
+                "Unknown";
+
+            const sla =
+                cleanValue(row.sla_status) ||
+                "Unknown";
+
+            const driver =
+                cleanValue(row.risk_drivers) ||
+                cleanValue(row.exception_type) ||
+                "—";
+
+
+            return `
+                <tr
+                    class="operation-row"
+                    data-transfer-id="${escapeHTML(row.transfer_id)}"
+                >
+
+                    <td>
+                        <strong>
+                            ${escapeHTML(row.transfer_id)}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            cleanValue(row.asset_name) ||
+                            cleanValue(row.ticker) ||
+                            "—"
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            numberValue(row.requested_value)
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(stage)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(sla)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(risk)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(driver)}
+                    </td>
+
+                </tr>
+            `;
+        })
+        .join("");
+
+
+    document
+        .querySelectorAll(".operation-row")
+        .forEach(row => {
+
+            row.addEventListener("click", () => {
+
+                const transferId =
+                    row.dataset.transferId;
+
+                showOperationDetails(transferId);
+            });
+        });
 }
 
 
@@ -513,191 +577,145 @@ function renderCriticalTable() {
 // OPERATION DETAILS
 // ============================================================
 
-function showOperationDetails(operation) {
+function showOperationDetails(transferId) {
+
+    const operation = allOperations.find(
+        row => String(row.transfer_id) === String(transferId)
+    );
+
+    if (!operation) return;
+
 
     const panel =
         document.getElementById("operationDetails");
 
-    const content =
-        document.getElementById("detailsContent");
-
     const subtitle =
         document.getElementById("detailsSubtitle");
 
+    const content =
+        document.getElementById("detailsContent");
 
-    panel.classList.remove("hidden");
+
+    if (!panel || !content) return;
 
 
     subtitle.textContent =
-        `${operation.transfer_id} · ${operation.asset_name || ""}`;
+        `Transfer ${operation.transfer_id}`;
 
 
-    const stages = [
-        "Requested",
-        "Validation",
-        "Approval",
-        "Registered",
-        "Sent to Custodian",
-        "In Transit",
-        "Settlement",
-        "Reconciliation",
-        "Completed"
+    const fields = [
+
+        ["Transfer ID", operation.transfer_id],
+        ["Client ID", operation.client_id],
+        ["Asset Type", operation.asset_type],
+        ["Asset Name", operation.asset_name],
+        ["Ticker", operation.ticker],
+
+        ["Quantity Requested", operation.quantity_requested],
+        ["Quantity Received", operation.quantity_received],
+
+        ["Requested Value",
+            formatCurrency(numberValue(operation.requested_value))
+        ],
+
+        ["Settled Value",
+            formatCurrency(numberValue(operation.settled_value))
+        ],
+
+        ["Origin Custodian", operation.origin_custodian],
+        ["Destination Custodian", operation.destination_custodian],
+
+        ["Transfer Type", operation.transfer_type],
+        ["Transfer Direction", operation.transfer_direction],
+
+        ["Request Date", operation.request_date],
+        ["Expected Settlement",
+            operation.expected_settlement_date
+        ],
+
+        ["Actual Settlement",
+            operation.actual_settlement_date
+        ],
+
+        ["Current Stage", operation.current_stage],
+        ["Status", operation.status],
+        ["Lifecycle Status", operation.lifecycle_status],
+        ["Priority", operation.priority],
+        ["Responsible Team", operation.responsible_team],
+
+        ["Documentation Complete",
+            operation.documentation_complete
+        ],
+
+        ["Exception Flag", operation.exception_flag],
+        ["Exception Type", operation.exception_type],
+
+        ["SLA Days", operation.sla_days],
+        ["Elapsed Days", operation.elapsed_days],
+        ["SLA Status", operation.sla_status],
+
+        ["Reconciliation Status",
+            operation.reconciliation_status
+        ],
+
+        ["Operational Risk",
+            operation.operational_risk
+        ],
+
+        ["Quantity Difference",
+            operation.quantity_difference
+        ],
+
+        ["Value Difference",
+            formatCurrency(
+                numberValue(operation.value_difference)
+            )
+        ],
+
+        ["Reconciliation Result",
+            operation.reconciliation_result
+        ],
+
+        ["Reconciliation Severity",
+            operation.reconciliation_severity
+        ],
+
+        ["Risk Score",
+            operation.risk_score
+        ],
+
+        ["Risk Drivers",
+            operation.risk_drivers
+        ],
+
+        ["Final Risk Level",
+            operation.final_risk_level
+        ]
     ];
 
 
-    const currentStageIndex =
-        stages.indexOf(operation.current_stage);
+    content.innerHTML = fields.map(([label, value]) => {
 
-
-    const lifecycleHTML = stages.map(
-        (stage, index) => {
-
-            let className = "lifecycle-stage";
-
-            if (index < currentStageIndex) {
-                className += " completed-stage";
-            }
-
-            if (index === currentStageIndex) {
-                className += " current-stage";
-            }
-
-
-            return `
-                <div class="${className}">
-                    <div class="stage-name">
-                        ${stage}
-                    </div>
-                </div>
-            `;
-        }
-    ).join("");
-
-
-    content.innerHTML = `
-
-        <div class="details-grid">
-
+        return `
             <div class="detail-item">
-                <span>Transfer ID</span>
-                <strong>${operation.transfer_id}</strong>
-            </div>
 
-            <div class="detail-item">
-                <span>Client</span>
-                <strong>${operation.client_id || "-"}</strong>
-            </div>
+                <span class="detail-label">
+                    ${escapeHTML(label)}
+                </span>
 
-            <div class="detail-item">
-                <span>Asset</span>
-                <strong>${operation.asset_name || "-"}</strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Ticker</span>
-                <strong>${operation.ticker || "-"}</strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Requested Value</span>
                 <strong>
-                    ${formatCurrency(operation.requested_value)}
+                    ${escapeHTML(
+                        cleanValue(value) || "—"
+                    )}
                 </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Origin Custodian</span>
-                <strong>
-                    ${operation.origin_custodian || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Destination Custodian</span>
-                <strong>
-                    ${operation.destination_custodian || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Transfer Type</span>
-                <strong>
-                    ${operation.transfer_type || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Current Stage</span>
-                <strong>
-                    ${operation.current_stage || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>SLA Status</span>
-                <strong>
-                    ${operation.sla_status || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Risk</span>
-                <strong>
-                    ${operation.operational_risk || "-"}
-                </strong>
-            </div>
-
-            <div class="detail-item">
-                <span>Risk Score</span>
-                <strong>
-                    ${operation.risk_score || "0"}
-                </strong>
-            </div>
-
-        </div>
-
-
-        <div class="panel lifecycle-panel">
-
-            <div class="panel-header">
-
-                <div>
-                    <h2>Lifecycle Progress</h2>
-                    <p>
-                        Current position within the transfer workflow
-                    </p>
-                </div>
 
             </div>
+        `;
 
-            <div class="lifecycle-flow">
-                ${lifecycleHTML}
-            </div>
-
-        </div>
+    }).join("");
 
 
-        <div class="panel">
-
-            <div class="panel-header">
-
-                <div>
-                    <h2>Risk Drivers</h2>
-                    <p>
-                        Factors contributing to the operational risk
-                    </p>
-                </div>
-
-            </div>
-
-            <div class="risk-drivers">
-                ${formatRiskDrivers(operation)}
-            </div>
-
-        </div>
-
-    `;
-
+    panel.classList.remove("hidden");
 
     panel.scrollIntoView({
         behavior: "smooth",
@@ -706,110 +724,14 @@ function showOperationDetails(operation) {
 }
 
 
-// ============================================================
-// BUTTONS
-// ============================================================
+function closeOperationDetails() {
 
-document
-    .getElementById("closeDetails")
-    .addEventListener("click", () => {
+    const panel =
+        document.getElementById("operationDetails");
 
-        document
-            .getElementById("operationDetails")
-            .classList.add("hidden");
-    });
-
-
-document
-    .getElementById("showAllBtn")
-    .addEventListener("click", () => {
-
-        renderAllHighRiskOperations();
-    });
-
-
-// ============================================================
-// SHOW ALL HIGH RISK
-// ============================================================
-
-function renderAllHighRiskOperations() {
-
-    const table =
-        document.getElementById("criticalTable");
-
-    table.innerHTML = "";
-
-
-    const operations = allOperations
-        .filter(row =>
-            ["Critical", "High"].includes(
-                row.operational_risk
-            )
-        )
-        .sort((a, b) =>
-            parseFloat(b.risk_score || 0) -
-            parseFloat(a.risk_score || 0)
-        );
-
-
-    operations.forEach(operation => {
-
-        const row = document.createElement("tr");
-
-        row.addEventListener(
-            "click",
-            () => showOperationDetails(operation)
-        );
-
-
-        row.innerHTML = `
-
-            <td>
-                <strong>${operation.transfer_id}</strong>
-            </td>
-
-            <td>
-                ${operation.asset_name || "-"}
-                <br>
-                <small>${operation.ticker || ""}</small>
-            </td>
-
-            <td>
-                ${formatCurrency(operation.requested_value)}
-            </td>
-
-            <td>
-                ${operation.current_stage || "-"}
-            </td>
-
-            <td>
-                <span class="badge ${
-                    operation.sla_status === "Outside SLA"
-                        ? "badge-sla"
-                        : "badge-low"
-                }">
-                    ${operation.sla_status || "-"}
-                </span>
-            </td>
-
-            <td>
-                <span class="badge ${
-                    operation.operational_risk === "Critical"
-                        ? "badge-critical"
-                        : "badge-high"
-                }">
-                    ${operation.operational_risk}
-                </span>
-            </td>
-
-            <td>
-                ${getPrimaryDriver(operation)}
-            </td>
-        `;
-
-
-        table.appendChild(row);
-    });
+    if (panel) {
+        panel.classList.add("hidden");
+    }
 }
 
 
@@ -817,82 +739,282 @@ function renderAllHighRiskOperations() {
 // HELPERS
 // ============================================================
 
+function isCriticalOperation(row) {
+
+    const risk =
+        normalize(row.final_risk_level);
+
+    const operationalRisk =
+        normalize(row.operational_risk);
+
+    const priority =
+        normalize(row.priority);
+
+    const exception =
+        isTrue(row.exception_flag);
+
+    const sla =
+        normalize(row.sla_status);
+
+
+    return (
+        risk === "critical" ||
+        operationalRisk === "critical" ||
+        priority === "critical" ||
+        exception ||
+        sla.includes("outside") ||
+        sla.includes("breach") ||
+        sla.includes("overdue") ||
+        sla.includes("fora")
+    );
+}
+
+
+function sortByRiskAndSLA(a, b) {
+
+    const riskWeight = {
+        critical: 4,
+        high: 3,
+        medium: 2,
+        moderate: 2,
+        low: 1
+    };
+
+
+    const aRisk =
+        riskWeight[
+            normalize(
+                a.final_risk_level ||
+                a.operational_risk
+            )
+        ] || 0;
+
+    const bRisk =
+        riskWeight[
+            normalize(
+                b.final_risk_level ||
+                b.operational_risk
+            )
+        ] || 0;
+
+
+    if (bRisk !== aRisk) {
+        return bRisk - aRisk;
+    }
+
+
+    const aElapsed =
+        numberValue(a.elapsed_days);
+
+    const bElapsed =
+        numberValue(b.elapsed_days);
+
+
+    return bElapsed - aElapsed;
+}
+
+
+function isOutsideSLA(value) {
+
+    const normalized = normalize(value);
+
+    return (
+        normalized.includes("outside") ||
+        normalized.includes("breach") ||
+        normalized.includes("overdue") ||
+        normalized.includes("fora")
+    );
+}
+
+
+function isCompleted(value) {
+
+    const normalized = normalize(value);
+
+    return (
+        normalized === "completed" ||
+        normalized === "complete" ||
+        normalized === "settled" ||
+        normalized === "settlement completed" ||
+        normalized === "concluido" ||
+        normalized === "concluida"
+    );
+}
+
+
+function isTrue(value) {
+
+    const normalized = normalize(value);
+
+    return (
+        normalized === "true" ||
+        normalized === "1" ||
+        normalized === "yes" ||
+        normalized === "y" ||
+        normalized === "sim"
+    );
+}
+
+
+function normalize(value) {
+
+    return String(value ?? "")
+        .trim()
+        .toLowerCase();
+}
+
+
+function cleanValue(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
+    }
+
+    return String(value).trim();
+}
+
+
+function numberValue(value) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return 0;
+    }
+
+
+    let stringValue =
+        String(value)
+            .trim()
+            .replace(/\s/g, "");
+
+
+    /*
+     * Supports:
+     * 493984607.46
+     * 493,984,607.46
+     * 493984607,46
+     * 493.984.607,46
+     */
+
+    if (
+        stringValue.includes(",") &&
+        stringValue.includes(".")
+    ) {
+
+        if (
+            stringValue.lastIndexOf(",") >
+            stringValue.lastIndexOf(".")
+        ) {
+
+            stringValue =
+                stringValue
+                    .replace(/\./g, "")
+                    .replace(",", ".");
+
+        } else {
+
+            stringValue =
+                stringValue.replace(/,/g, "");
+        }
+
+    } else if (stringValue.includes(",")) {
+
+        stringValue =
+            stringValue.replace(",", ".");
+
+    }
+
+
+    const result =
+        parseFloat(
+            stringValue.replace(/[^\d.-]/g, "")
+        );
+
+
+    return Number.isFinite(result)
+        ? result
+        : 0;
+}
+
+
+function formatNumber(value) {
+
+    return new Intl.NumberFormat("en-US")
+        .format(value);
+}
+
+
 function formatCurrency(value) {
 
-    const number = parseFloat(value || 0);
-
-    return currencyFormatter.format(number);
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(value);
 }
 
 
-function formatCompactCurrency(value) {
+function setText(id, value) {
 
-    if (value >= 1000000000) {
-        return "$" + (value / 1000000000).toFixed(1) + "B";
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+        element.textContent = value;
     }
-
-    if (value >= 1000000) {
-        return "$" + (value / 1000000).toFixed(1) + "M";
-    }
-
-    if (value >= 1000) {
-        return "$" + (value / 1000).toFixed(1) + "K";
-    }
-
-    return currencyFormatter.format(value);
 }
 
 
-function getPrimaryDriver(operation) {
+function escapeHTML(value) {
 
-    if (
-        operation.risk_drivers &&
-        operation.risk_drivers.trim()
-    ) {
-
-        return operation.risk_drivers
-            .split("|")[0]
-            .trim();
-    }
-
-
-    if (
-        operation.exception_type &&
-        operation.exception_type !== "None"
-    ) {
-
-        return operation.exception_type;
-    }
-
-
-    return "-";
-}
-
-
-function formatRiskDrivers(operation) {
-
-    if (
-        !operation.risk_drivers ||
-        !operation.risk_drivers.trim()
-    ) {
-
-        return "<p>No risk drivers identified.</p>";
-    }
-
-
-    return operation.risk_drivers
-        .split("|")
-        .map(driver => `
-            <span class="badge badge-critical">
-                ${driver.trim()}
-            </span>
-        `)
-        .join(" ");
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 
 // ============================================================
-// START
+// ERROR MESSAGE
 // ============================================================
 
-loadData();
+function showError(message) {
+
+    let errorBox =
+        document.getElementById("dashboardError");
+
+
+    if (!errorBox) {
+
+        errorBox =
+            document.createElement("div");
+
+        errorBox.id =
+            "dashboardError";
+
+        errorBox.style.cssText = `
+            margin: 20px auto;
+            max-width: 1200px;
+            padding: 16px 20px;
+            border: 1px solid #7f1d1d;
+            background: #2a1111;
+            color: #fecaca;
+            border-radius: 8px;
+            font-family: Arial, sans-serif;
+        `;
+
+        document.body.prepend(errorBox);
+    }
+
+
+    errorBox.textContent = message;
+}
