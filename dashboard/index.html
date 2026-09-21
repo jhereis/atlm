@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Asset Transfer Lifecycle</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div>
+            <h1>Asset Transfer Lifecycle</h1>
+            <p>Operational monitoring and lifecycle control</p>
+        </div>
+
+        <div class="status-indicator">
+            <span></span>
+            Live Data
+        </div>
+    </header>
+
+
+    <main class="container">
+
+        <!-- KPI CARDS -->
+
+        <section class="kpi-grid">
+
+            <div class="kpi-card">
+                <span class="kpi-label">Total Transfers</span>
+                <strong id="totalTransfers">-</strong>
+                <small>All monitored operations</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Pending Transfers</span>
+                <strong id="pendingTransfers">-</strong>
+                <small>Operations not completed</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Outside SLA</span>
+                <strong id="outsideSla">-</strong>
+                <small>Operations requiring attention</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Exceptions</span>
+                <strong id="exceptions">-</strong>
+                <small>Operational exceptions</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Critical Risk</span>
+                <strong id="criticalRisk">-</strong>
+                <small>Highest priority operations</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Asset Value</span>
+                <strong id="assetValue">-</strong>
+                <small>Total requested value</small>
+            </div>
+
+        </section>
+
+
+        <!-- LIFECYCLE -->
+
+        <section class="panel lifecycle-panel">
+
+            <div class="panel-header">
+                <div>
+                    <h2>Transfer Lifecycle</h2>
+                    <p>Current distribution of operations across the lifecycle</p>
+                </div>
+            </div>
+
+            <div id="lifecycleFlow" class="lifecycle-flow"></div>
+
+        </section>
+
+
+        <!-- CHARTS -->
+
+        <section class="chart-grid">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>SLA Monitoring</h2>
+                        <p>Operations within and outside SLA</p>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="slaChart"></canvas>
+                </div>
+            </div>
+
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Risk Distribution</h2>
+                        <p>Operational risk classification</p>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="riskChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- EXCEPTIONS -->
+
+        <section class="panel">
+
+            <div class="panel-header">
+                <div>
+                    <h2>Operational Exceptions</h2>
+                    <p>Main reasons requiring operational intervention</p>
+                </div>
+            </div>
+
+            <div class="chart-container exception-chart">
+                <canvas id="exceptionChart"></canvas>
+            </div>
+
+        </section>
+
+
+        <!-- CRITICAL OPERATIONS -->
+
+        <section class="panel">
+
+            <div class="panel-header">
+                <div>
+                    <h2>Critical Operations</h2>
+                    <p>Transfers requiring immediate operational attention</p>
+                </div>
+
+                <button id="showAllBtn">View All</button>
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Transfer</th>
+                            <th>Asset</th>
+                            <th>Value</th>
+                            <th>Stage</th>
+                            <th>SLA</th>
+                            <th>Risk</th>
+                            <th>Driver</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="criticalTable"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- OPERATION DETAILS -->
+
+        <section id="operationDetails" class="panel details-panel hidden">
+
+            <div class="panel-header">
+
+                <div>
+                    <h2>Operation Details</h2>
+                    <p id="detailsSubtitle"></p>
+                </div>
+
+                <button id="closeDetails">Close</button>
+
+            </div>
+
+            <div id="detailsContent"></div>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+        Asset Transfer Lifecycle Management
+        <span>•</span>
+        Synthetic operational dataset
+        <span>•</span>
+        Python · Pandas · SQL · JavaScript
+    </footer>
+
+
+    <script src="dashboard.js"></script>
+
+</body>
+</html>
