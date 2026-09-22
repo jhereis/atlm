@@ -1,115 +1,3 @@
-/* ============================================================
-   PROJECT OVERVIEW
-   ============================================================ */
-
-.project-overview {
-    margin-bottom: 24px;
-}
-
-.project-intro {
-    max-width: 1100px;
-    margin-bottom: 28px;
-}
-
-.project-intro p {
-    margin: 0;
-    line-height: 1.7;
-    color: #64748b;
-    font-size: 15px;
-}
-
-.star-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 18px;
-}
-
-.star-card {
-    padding: 22px;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    background: #f8fafc;
-}
-
-.star-label {
-    display: inline-block;
-    margin-bottom: 10px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    color: #64748b;
-}
-
-.star-card h3 {
-    margin: 0 0 10px;
-    font-size: 18px;
-    color: #1e293b;
-}
-
-.star-card p {
-    margin: 0 0 10px;
-    line-height: 1.65;
-    font-size: 14px;
-    color: #64748b;
-}
-
-.star-card p:last-child {
-    margin-bottom: 0;
-}
-
-.result-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.result-metrics div {
-    padding: 12px;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-}
-
-.result-metrics strong {
-    display: block;
-    font-size: 21px;
-    color: #1e293b;
-}
-
-.result-metrics span {
-    display: block;
-    margin-top: 3px;
-    font-size: 11px;
-    color: #64748b;
-}
-
-.project-note {
-    margin-top: 20px;
-    padding: 14px 16px;
-    border-left: 3px solid #94a3b8;
-    background: #f8fafc;
-    color: #64748b;
-    font-size: 12px;
-    line-height: 1.6;
-}
-
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-
-@media (max-width: 900px) {
-
-    .star-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .result-metrics {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
 :root {
     --background: #f4f6f9;
     --surface: #ffffff;
@@ -564,6 +452,161 @@ footer span {
     margin: 0 5px;
 }
 
+/* ============================================================
+   ABOUT THE PROJECT
+============================================================ */
+
+.about-project {
+    margin-top: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.about-header {
+    margin-bottom: 12px;
+}
+
+.about-header h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.about-header p {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.about-intro {
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    max-width: 1150px;
+}
+
+.about-intro strong {
+    color: #64748b;
+}
+
+
+/* SMART GRID */
+
+.smart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+
+/* SMART CARDS */
+
+.smart-card {
+    background: #f8fafc;
+    border: 1px solid #dbe3ec;
+    border-radius: 11px;
+    padding: 20px;
+}
+
+.smart-card-wide {
+    grid-column: span 2;
+}
+
+.smart-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 9px;
+}
+
+.smart-card h3 {
+    margin: 0 0 9px;
+    font-size: 17px;
+    color: var(--text-primary);
+}
+
+.smart-card p {
+    margin: 0;
+    color: #718096;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+
+/* METRICS */
+
+.smart-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.smart-metric {
+    background: #ffffff;
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
+    padding: 11px;
+}
+
+.smart-metric strong {
+    display: block;
+    font-size: 21px;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.smart-metric span {
+    display: block;
+    font-size: 10px;
+    color: #718096;
+}
+
+
+/* DISCLAIMER */
+
+.about-disclaimer {
+    margin-top: 18px;
+    padding: 13px 16px;
+
+    background: #f8fafc;
+
+    border-left: 3px solid #94a3b8;
+
+    color: #718096;
+
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.about-disclaimer strong {
+    color: #64748b;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 900px) {
+
+    .smart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .smart-card-wide {
+        grid-column: span 1;
+    }
+
+    .smart-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+}
 
 /* =========================
    RESPONSIVE
