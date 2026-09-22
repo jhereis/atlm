@@ -1,110 +1,215 @@
-<section class="panel project-overview">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <div class="panel-header">
+    <title>Asset Transfer Lifecycle</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+
+<body>
+
+    <header class="topbar">
         <div>
-            <h2>About the Project</h2>
-            <p>Operational problem, solution approach and results</p>
-        </div>
-    </div>
-
-    <div class="project-intro">
-        <p>
-            <strong>Asset Transfer Lifecycle (ATLM)</strong> is an operational
-            monitoring solution designed to provide end-to-end visibility
-            across asset transfer processes, from request to settlement
-            and reconciliation.
-        </p>
-    </div>
-
-    <div class="star-grid">
-
-        <!-- SITUATION -->
-        <div class="star-card">
-            <span class="star-label">SITUATION</span>
-
-            <h3>Limited Operational Visibility</h3>
-
-            <p>
-                Asset transfers involve multiple stages, teams and custodians.
-                Pending operations, SLA breaches, reconciliation differences
-                and operational exceptions can be difficult to identify
-                and prioritize without centralized monitoring.
-            </p>
+            <h1>Asset Transfer Lifecycle</h1>
+            <p>Operational monitoring and lifecycle control</p>
         </div>
 
-        <!-- TASK -->
-        <div class="star-card">
-            <span class="star-label">TASK</span>
-
-            <h3>Centralize Operational Control</h3>
-
-            <p>
-                The objective was to consolidate transfer information and
-                create a single operational view capable of monitoring
-                lifecycle stages, deadlines, exceptions, reconciliation
-                and operational risk.
-            </p>
+        <div class="status-indicator">
+            <span></span>
+            Live Data
         </div>
+    </header>
 
-        <!-- ACTION -->
-        <div class="star-card">
-            <span class="star-label">ACTION</span>
 
-            <h3>Build a Data-Driven Solution</h3>
+    <main class="container">
 
-            <p>
-                I developed an end-to-end monitoring solution using
-                <strong>Python, Pandas, SQL and JavaScript</strong>.
-                Operational data is processed through validation,
-                reconciliation, SLA and risk controls before being
-                presented in an interactive dashboard.
-            </p>
-        </div>
+        <!-- KPI CARDS -->
 
-        <!-- RESULT -->
-        <div class="star-card">
-            <span class="star-label">RESULT</span>
+        <section class="kpi-grid">
 
-            <h3>Visibility, Prioritization &amp; Control</h3>
+            <div class="kpi-card">
+                <span class="kpi-label">Total Transfers</span>
+                <strong id="totalTransfers">-</strong>
+                <small>All monitored operations</small>
+            </div>
 
-            <p>
-                The solution provides a centralized view of the transfer
-                lifecycle, helping identify operations requiring attention
-                and prioritize exceptions and critical cases.
-            </p>
+            <div class="kpi-card">
+                <span class="kpi-label">Pending Transfers</span>
+                <strong id="pendingTransfers">-</strong>
+                <small>Operations not completed</small>
+            </div>
 
-            <div class="result-metrics">
+            <div class="kpi-card">
+                <span class="kpi-label">Outside SLA</span>
+                <strong id="outsideSla">-</strong>
+                <small>Operations requiring attention</small>
+            </div>
 
+            <div class="kpi-card">
+                <span class="kpi-label">Exceptions</span>
+                <strong id="exceptions">-</strong>
+                <small>Operational exceptions</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Critical Risk</span>
+                <strong id="criticalRisk">-</strong>
+                <small>Highest priority operations</small>
+            </div>
+
+            <div class="kpi-card">
+                <span class="kpi-label">Asset Value</span>
+                <strong id="assetValue">-</strong>
+                <small>Total requested value</small>
+            </div>
+
+        </section>
+
+
+        <!-- LIFECYCLE -->
+
+        <section class="panel lifecycle-panel">
+
+            <div class="panel-header">
                 <div>
-                    <strong>500</strong>
-                    <span>Transfers monitored</span>
+                    <h2>Transfer Lifecycle</h2>
+                    <p>Current distribution of operations across the lifecycle</p>
+                </div>
+            </div>
+
+            <div id="lifecycleFlow" class="lifecycle-flow"></div>
+
+        </section>
+
+
+        <!-- CHARTS -->
+
+        <section class="chart-grid">
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>SLA Monitoring</h2>
+                        <p>Operations within and outside SLA</p>
+                    </div>
                 </div>
 
-                <div>
-                    <strong>173</strong>
-                    <span>Outside SLA</span>
+                <div class="chart-container">
+                    <canvas id="slaChart"></canvas>
+                </div>
+            </div>
+
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Risk Distribution</h2>
+                        <p>Operational risk classification</p>
+                    </div>
                 </div>
 
+                <div class="chart-container">
+                    <canvas id="riskChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- EXCEPTIONS -->
+
+        <section class="panel">
+
+            <div class="panel-header">
                 <div>
-                    <strong>85</strong>
-                    <span>Exceptions</span>
+                    <h2>Operational Exceptions</h2>
+                    <p>Main reasons requiring operational intervention</p>
+                </div>
+            </div>
+
+            <div class="chart-container exception-chart">
+                <canvas id="exceptionChart"></canvas>
+            </div>
+
+        </section>
+
+
+        <!-- CRITICAL OPERATIONS -->
+
+        <section class="panel">
+
+            <div class="panel-header">
+                <div>
+                    <h2>Critical Operations</h2>
+                    <p>Transfers requiring immediate operational attention</p>
                 </div>
 
-                <div>
-                    <strong>81</strong>
-                    <span>Critical Risk</span>
-                </div>
+                <button id="showAllBtn">View All</button>
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Transfer</th>
+                            <th>Asset</th>
+                            <th>Value</th>
+                            <th>Stage</th>
+                            <th>SLA</th>
+                            <th>Risk</th>
+                            <th>Driver</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="criticalTable"></tbody>
+
+                </table>
 
             </div>
-        </div>
 
-    </div>
+        </section>
 
-    <div class="project-note">
-        <strong>Dataset:</strong>
-        Synthetic operational data used to demonstrate the monitoring,
-        reconciliation, SLA and risk-control capabilities of the solution.
-        Metrics do not represent measured production business impact.
-    </div>
 
-</section>
+        <!-- OPERATION DETAILS -->
+
+        <section id="operationDetails" class="panel details-panel hidden">
+
+            <div class="panel-header">
+
+                <div>
+                    <h2>Operation Details</h2>
+                    <p id="detailsSubtitle"></p>
+                </div>
+
+                <button id="closeDetails">Close</button>
+
+            </div>
+
+            <div id="detailsContent"></div>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+        Asset Transfer Lifecycle Management
+        <span>•</span>
+        Synthetic operational dataset
+        <span>•</span>
+        Python · Pandas · SQL · JavaScript
+    </footer>
+
+
+    <script src="dashboard.js"></script>
+
+</body>
+</html>
